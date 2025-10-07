@@ -1,0 +1,2027 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设备数据管理平台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <style>
+        .result-box {
+            min-height: 200px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: Consolas, Monaco, monospace;
+            font-size: 14px;
+        }
+        .header {
+            background: linear-gradient(135deg, #FF69B4 0%, #EE82EE 100%);
+            color: white;
+            padding: 30px 0;
+            margin-bottom: 30px;
+        }
+        .btn-action {
+            margin: 5px;
+            padding: 10px 20px;
+        }
+        .danger-zone {
+            border-top: 2px dashed #dc3545;
+            padding-top: 20px;
+            margin-top: 30px;
+        }
+        #downloadExcelBtn {
+            margin: 10px 0;
+        }
+        #downloadArea {
+            /* display: none; 移除默认隐藏 */
+            text-align: right;
+            margin-top: 10px;
+        }
+        .insert-section input.form-control {
+            font-size: 12px;
+            padding: 4px 8px;
+        }
+        .insert-section label {
+            font-size: 12px;
+            font-weight: normal;
+        }
+        /* MAC 选择器样式 */
+        .mac-selector-container {
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            margin-bottom: 15px;
+        }
+        .mac-selector-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .mac-selector-title {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: bold;
+        }
+        .mac-selector-actions {
+            display: flex;
+            gap: 5px;
+        }
+        .mac-selector-actions .btn {
+            padding: 4px 10px; /* 调整按钮大小 */
+            font-size: 0.875rem;
+        }
+        .mac-search-box {
+            margin-bottom: 10px;
+        }
+        .mac-search-box input {
+            font-size: 0.875rem; /* 调整搜索框字体 */
+            padding: 6px 10px;
+        }
+        .mac-tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px; /* 稍微加大标签间距 */
+            max-height: 180px; /* 稍微加高，避免滚动太频繁 */
+            overflow-y: auto;
+            padding: 8px;
+            border: 1px dashed #ced4da;
+            border-radius: 6px;
+            background-color: #ffffff;
+        }
+        .mac-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            font-size: 0.875rem; /* 14px，更大更清晰 */
+            font-weight: 500;
+            background-color: #e9ecef;
+            border: 1px solid #ced4da;
+            border-radius: 12px;
+            cursor: pointer;
+            min-width: 110px;
+            transition: all 0.2s ease;
+        }
+        .mac-tag:hover {
+            background-color: #d1d5d8;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .mac-tag.selected {
+            background-color: #0d6efd; /* Bootstrap primary color */
+            color: white;
+            border-color: #0b5ed7;
+            transform: translateY(-1px);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+        }
+        /* 为每个模块的 MAC 选择器添加一点底部边距 */
+        .card-body > .mac-selector-container {
+            margin-top: 10px;
+        }
+        /* 操作按钮组紧凑排列 */
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            align-items: end;
+        }
+        .action-buttons .btn {
+            white-space: nowrap;
+        }
+        /* 时间输入框样式 */
+        .time-inputs {
+            margin-top: 15px;
+        }
+        .time-inputs .form-label {
+            font-size: 0.85rem;
+        }
+        .time-inputs .form-control {
+            font-size: 0.85rem;
+            padding: 4px 8px;
+        }
+        /* 图表容器样式 */
+        .chart-container {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background-color: #fff;
+        }
+        .chart-title {
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+            text-align: center;
+        }
+        .chart-canvas-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+        }
+        .no-data-message {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            padding: 40px;
+        }
+        /* 调试区域样式 */
+        .debug-section {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        .debug-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .debug-content {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            background-color: #fff;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .debug-item {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .debug-item:last-child {
+            border-bottom: none;
+        }
+        .debug-time {
+            color: #0d6efd;
+            font-weight: bold;
+        }
+        .debug-rssi {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        /* 数据截断提示 */
+        .data-truncated {
+            color: #6c757d;
+            font-style: italic;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            text-align: center;
+        }
+        /* 图表控制按钮 */
+        .chart-controls {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .chart-controls .btn {
+            margin: 0 5px;
+            font-size: 0.875rem;
+            padding: 4px 10px;
+        }
+        /* 下载状态指示器 */
+        .download-status {
+            font-size: 0.875rem;
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 5px;
+        }
+        .download-status.downloading {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .download-status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .download-status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        /* 状态图表的 Y 轴标签样式 */
+        .status-chart-legend {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 0.9rem;
+        }
+        .status-chart-legend span {
+            display: inline-block;
+            margin: 0 10px;
+        }
+        .status-chart-legend .dot {
+            height: 10px;
+            width: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .dot-bound { background-color: #28a745; } /* 绿色 */
+        .dot-unbound { background-color: #dc3545; } /* 红色 */
+        .dot-intransition { background-color: #6c757d; } /* 灰色 */
+        /* Beacon 输入框容器样式 */
+        .beacon-inputs-container {
+            margin-top: 10px;
+        }
+        .beacon-input-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .beacon-input-row input {
+            flex: 1;
+            margin-right: 5px;
+        }
+        .beacon-input-row button {
+            padding: 4px 8px;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+<div class="header text-center">
+    <div class="container">
+        <h1>📡 设备数据管理平台</h1>
+    </div>
+</div>
+<div class="container">
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">📊 查询选中设备所有数据</h5>
+        </div>
+        <div class="card-body">
+            <div class="mac-selector-container" id="queryAllMacSelector">
+                <div class="mac-selector-header">
+                    <h6 class="mac-selector-title">选择 MAC 地址（支持多选）</h6>
+                    <div class="mac-selector-actions">
+                        <button class="btn btn-outline-primary btn-sm" onclick="loadMacListForCurrentSelector(this)">🔄 加载</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="toggleSelectAllTags(this, true)">全选</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="toggleSelectAllTags(this, false)">清空</button>
+                    </div>
+                </div>
+                <div class="mac-search-box">
+                    <input type="text" class="form-control form-control-sm" placeholder="搜索 MAC..." oninput="filterTags(this)">
+                </div>
+                <div class="mac-tags-container"></div>
+            </div>
+            <div class="time-inputs">
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label class="form-label">Beacon MAC（可选）</label>
+                        <input type="text" class="form-control form-control-sm" placeholder="例如：84C2E4000033" id="beaconMacFilter" value="84C2E4000033">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">起始时间（可选）</label>
+                        <input type="datetime-local" class="form-control form-control-sm" id="startTimeFilter">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">终止时间（可选）</label>
+                        <input type="datetime-local" class="form-control form-control-sm" id="endTimeFilter">
+                    </div>
+                </div>
+            </div>
+            <div class="action-buttons mt-3">
+                <button onclick="querySelectedMacsAll(this)" class="btn btn-success btn-sm">
+                    📊 查询选中设备所有数据 (显示前10条)
+                </button>
+                <button onclick="downloadSelectedMacsAll(this)" class="btn btn-info btn-sm">
+                    📥 下载选中设备所有数据 (Excel)
+                </button>
+                <div id="downloadStatus" class="download-status" style="display:none;"></div>
+            </div>
+            <div class="form-text text-muted mt-2">点击“加载”按钮获取 MAC 列表，可选择一个或多个 MAC 地址进行查询。支持按 Beacon MAC 和时间范围筛选。</div>
+        </div>
+    </div>
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">📈 查询选中设备最新 N 条数据</h5>
+        </div>
+        <div class="card-body">
+            <div class="mac-selector-container" id="queryLatestMacSelector">
+                <div class="mac-selector-header">
+                    <h6 class="mac-selector-title">选择 MAC 地址 (仅支持单选)</h6>
+                    <div class="mac-selector-actions">
+                        <button class="btn btn-outline-primary btn-sm" onclick="loadMacListForCurrentSelector(this)">🔄 加载</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="toggleSelectAllTags(this, false)">清空</button>
+                    </div>
+                </div>
+                <div class="mac-search-box">
+                    <input type="text" class="form-control form-control-sm" placeholder="搜索 MAC..." oninput="filterTags(this)">
+                </div>
+                <div class="mac-tags-container"></div>
+            </div>
+            <div class="action-buttons align-items-end">
+                <div>
+                    <label class="form-label mb-0">返回条数 N</label>
+                    <input type="number" class="form-control form-control-sm" value="5" min="1" max="100" style="width: 100px;" id="latestNumInput">
+                </div>
+                <button onclick="querySelectedMacLatest(this)" class="btn btn-primary btn-sm">
+                    📈 查询选中设备最新 N 条
+                </button>
+            </div>
+            <div class="form-text text-muted mt-2">点击“加载”按钮获取 MAC 列表，然后选择一个 MAC 地址，并输入要查询的条数。</div>
+        </div>
+    </div>
+    <!-- 修改：移除起始时间输入框 -->
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">🔗 查询动力车最近一次工作日志</h5>
+        </div>
+        <div class="card-body">
+            <div class="mac-selector-container" id="queryStatusMacSelector">
+                <div class="mac-selector-header">
+                    <h6 class="mac-selector-title">选择动力车MAC 地址</h6>
+                    <div class="mac-selector-actions">
+                        <button class="btn btn-outline-primary btn-sm" onclick="loadMacListForCurrentSelector(this)">🔄 加载</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="toggleSelectAllTags(this, true)">全选</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="toggleSelectAllTags(this, false)">清空</button>
+                    </div>
+                </div>
+                <div class="mac-search-box">
+                    <input type="text" class="form-control form-control-sm" placeholder="搜索 MAC..." oninput="filterTags(this)">
+                </div>
+                <div class="mac-tags-container"></div>
+            </div>
+            <div class="time-inputs">
+                <div class="row g-2">
+                    <!-- 移除 Beacon MAC 输入框 -->
+                    <!-- 移除 起始时间 输入框 -->
+                    <!-- 移除 终止时间 输入框 -->
+                </div>
+            </div>
+            <div class="action-buttons mt-3">
+                <button onclick="queryConnectionStatus(this)" class="btn btn-warning btn-sm">
+                    🔗 查询选中基站连接状态
+                </button>
+            </div>
+            <div class="form-text text-muted mt-2">选择一个或多个基站 MAC 地址进行连接状态查询。</div>
+        </div>
+    </div>
+    <!-- 新增：查询动力车工作日志时间范围 -->
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">📋 查询动力车工作日志时间范围</h5>
+        </div>
+        <div class="card-body">
+            <div class="mac-selector-container" id="queryWorkLogTimeRangeMacSelector">
+                <div class="mac-selector-header">
+                    <h6 class="mac-selector-title">选择动力车MAC 地址</h6>
+                    <div class="mac-selector-actions">
+                        <button class="btn btn-outline-primary btn-sm" onclick="loadMacListForCurrentSelector(this)">🔄 加载</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="toggleSelectAllTags(this, true)">全选</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="toggleSelectAllTags(this, false)">清空</button>
+                    </div>
+                </div>
+                <div class="mac-search-box">
+                    <input type="text" class="form-control form-control-sm" placeholder="搜索 MAC..." oninput="filterTags(this)">
+                </div>
+                <div class="mac-tags-container"></div>
+            </div>
+            <div class="time-inputs">
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <label class="form-label">Beacon MAC（可选，支持添加多个）</label>
+                        <div class="beacon-inputs-container" id="beaconInputsContainer">
+                            <!-- 动态添加的输入框将放在这里 -->
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addBeaconInput()">+</button>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">起始时间（可选）</label>
+                        <input type="datetime-local" class="form-control form-control-sm" id="workLogStartTimeFilter">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">终止时间（可选）</label>
+                        <input type="datetime-local" class="form-control form-control-sm" id="workLogEndTimeFilter">
+                    </div>
+                </div>
+            </div>
+            <div class="action-buttons mt-3">
+                <button onclick="queryWorkLogTimeRange(this)" class="btn btn-info btn-sm">
+                    📋 查询选中动力车工作日志时间范围
+                </button>
+            </div>
+            <div class="form-text text-muted mt-2">选择一个或多个动力车 MAC 地址，并指定时间范围查询其工作日志（绑定/解绑状态变化）。可以指定一个或多个 Beacon MAC 地址进行过滤。</div>
+        </div>
+    </div>
+    <!-- 新增：查询无动力车某段时间的收费 -->
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">💰 查询无动力车某段时间收费</h5>
+        </div>
+        <div class="card-body">
+            <div class="mac-selector-container" id="queryMoneyMacSelector">
+                <div class="mac-selector-header">
+                    <h6 class="mac-selector-title">选择主设备 MAC（可多选）</h6>
+                    <div class="mac-selector-actions">
+                        <button class="btn btn-outline-primary btn-sm" onclick="loadMacListForCurrentSelector(this)">🔄 加载</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="toggleSelectAllTags(this, true)">全选</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="toggleSelectAllTags(this, false)">清空</button>
+                    </div>
+                </div>
+                <div class="mac-search-box">
+                    <input type="text" class="form-control form-control-sm" placeholder="搜索 MAC..." oninput="filterTags(this)">
+                </div>
+                <div class="mac-tags-container"></div>
+            </div>
+            <div class="time-inputs">
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label class="form-label">Beacon MAC（可选）</label>
+                        <input type="text" class="form-control form-control-sm" id="moneyBeaconMac" placeholder="例如：84C2E4000033">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">起始时间（可选）</label>
+                        <input type="datetime-local" class="form-control form-control-sm" id="moneyStartTime">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">终止时间（可选）</label>
+                        <input type="datetime-local" class="form-control form-control-sm" id="moneyEndTime">
+                    </div>
+                </div>
+            </div>
+            <div class="action-buttons mt-3">
+                <button onclick="queryMoney(this)" class="btn btn-secondary btn-sm">
+                    💰 查询收费
+                </button>
+            </div>
+            <div class="form-text text-muted mt-2">选择一个或多个主设备 MAC，可指定 Beacon MAC 和时间范围，查询对应时间段内的总费用（单位：分或元，取决于后端）。</div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">🗑️ 删除选中设备所有数据</h5>
+        </div>
+        <div class="card-body">
+            <div class="mac-selector-container" id="deleteMacSelector">
+                <div class="mac-selector-header">
+                    <h6 class="mac-selector-title">选择 MAC 地址</h6>
+                    <div class="mac-selector-actions">
+                        <button class="btn btn-outline-primary btn-sm" onclick="loadMacListForCurrentSelector(this)">🔄 加载</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="toggleSelectAllTags(this, true)">全选</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="toggleSelectAllTags(this, false)">清空</button>
+                    </div>
+                </div>
+                <div class="mac-search-box">
+                    <input type="text" class="form-control form-control-sm" placeholder="搜索 MAC..." oninput="filterTags(this)">
+                </div>
+                <div class="mac-tags-container"></div>
+            </div>
+            <div class="action-buttons">
+                <button onclick="deleteSelectedMacsAll(this)" class="btn btn-danger btn-sm">
+                    🗑️ 删除选中设备所有数据
+                </button>
+            </div>
+            <div class="form-text text-danger mt-2">⚠️ 此操作不可恢复！请谨慎选择。</div>
+        </div>
+    </div>
+    <div class="card mb-4 danger-zone">
+        <div class="card-header bg-danger text-white">
+            <h5>⚠️ 危险操作区</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-danger"><strong>注意：</strong>此操作将清空数据库中所有记录，不可恢复！</p>
+            <button onclick="deleteAll()" class="btn btn-outline-danger btn-action">🚨 清空所有数据</button>
+        </div>
+    </div>
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h5>📥 手动插入新记录</h5>
+        </div>
+        <div class="card-body insert-section">
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <label>v</label>
+                    <input type="number" id="insertV" class="form-control form-control-sm" value="1" required>
+                </div>
+                <div class="col-md-3">
+                    <label>主设备 MAC</label>
+                    <input type="text" id="insertMainMac" class="form-control form-control-sm" value="AB231100000F" required>
+                </div>
+                <div class="col-md-3">
+                    <label>QCCID</label>
+                    <input type="text" id="insertQccid" class="form-control form-control-sm" value="898604D2192220256819" required>
+                </div>
+                <div class="col-md-3">
+                    <label>电量</label>
+                    <input type="number" id="insertBattery" class="form-control form-control-sm" value="88" required>
+                </div>
+                <div class="col-md-3">
+                    <label>纬度</label>
+                    <input type="number" id="insertLat" class="form-control form-control-sm" value="0" step="0.000001" required>
+                </div>
+                <div class="col-md-3">
+                    <label>经度</label>
+                    <input type="number" id="insertLon" class="form-control form-control-sm" value="0" step="0.000001" required>
+                </div>
+                <div class="col-md-3">
+                    <label>时间 B</label>
+                    <input type="text" id="insertTimeB" class="form-control form-control-sm" value="68BAFA40" required>
+                </div>
+                <div class="col-md-3">
+                    <label>扫描类型</label>
+                    <input type="number" id="insertScanType" class="form-control form-control-sm" value="4" required>
+                </div>
+                <div class="col-md-3">
+                    <label>扫描时间</label>
+                    <input type="text" id="insertTime" class="form-control form-control-sm" value="68BAFA3D" required>
+                </div>
+                <div class="col-md-3">
+                    <label>Beacon MAC</label>
+                    <input type="text" id="insertBeaconMac" class="form-control form-control-sm" value="84C2E4000033" required>
+                </div>
+                <div class="col-md-3">
+                    <label>RSSI</label>
+                    <input type="number" id="insertRssi" class="form-control form-control-sm" value="-65" required>
+                </div>
+                <div class="col-md-3">
+                    <label>广播数据</label>
+                    <input type="text" id="insertAdvData" class="form-control form-control-sm" value="FFFF0000000000000000000000000000000000000000000000000000000000" required>
+                </div>
+                <div class="col-12 mt-2">
+                    <button onclick="insertData()" class="btn btn-primary btn-sm">🚀 插入数据</button>
+                    <span id="insertResult" class="ms-2"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="chartsContainer" class="mt-4">
+    </div>
+    <h4>📊 操作结果</h4>
+    <div id="downloadArea">
+    </div>
+    <div class="result-box" id="resultBox">
+        等待操作...
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const resultBox = document.getElementById('resultBox');
+    const downloadArea = document.getElementById('downloadArea');
+    const insertResult = document.getElementById('insertResult');
+    const chartsContainer = document.getElementById('chartsContainer');
+    const downloadStatus = document.getElementById('downloadStatus');
+    let lastQueryData = null; // 用于显示的数据
+    let lastDownloadData = null; // 用于下载的数据
+    let globalAllMacs = []; // 全局缓存的 MAC 列表
+    let chartInstances = []; // 存储图表实例
+    let abortControllers = []; // 存储当前所有活跃请求的控制器
+    // 设置基础URL（根据你的后端地址调整）
+    // const API_BASE = 'http://101.133.172.181:8049';
+    const API_BASE = 'http://127.0.0.1:8049';
+    // --- 状态映射常量 ---
+    const STATUS_MAP = {
+        'Bound': 3,
+        'In Transition': 2,
+        'Unbound': 1
+    };
+    const STATUS_COLOR = {
+        'Bound': '#28a745', // 绿色
+        'In Transition': '#ffc107', // 橙色/黄色（与灰色作区分，用警告色）
+        'Unbound': '#dc3545' // 红色
+    };
+    const STATUS_Y_LABELS = {
+        1: 'Unbound (未绑定)',
+        2: 'In Transition (转换中)',
+        3: 'Bound (已绑定)'
+    };
+    // --- 通用日期时间格式化函数 ---
+    function formatDateTimeForBackend(localDateTime) {
+        if (!localDateTime) return '';
+        // localDateTime 格式: "2024-06-01T10:30"
+        const [datePart, timePart] = localDateTime.split('T');
+        const [year, month, day] = datePart.split('-').map(Number);
+        const [hours, minutes] = timePart.split(':').map(Number);
+        // 构造本地时间（不经过 UTC 转换）
+        const localDate = new Date(year, month - 1, day, hours, minutes, 0);
+        // 格式化为 "YYYY-MM-DD HH:mm:ss"
+        const pad = n => String(n).padStart(2, '0');
+        return `${localDate.getFullYear()}-${pad(localDate.getMonth() + 1)}-${pad(localDate.getDate())} ${pad(localDate.getHours())}:${pad(localDate.getMinutes())}:${pad(localDate.getSeconds())}`;
+    }
+    // --- Beacon 输入框管理 ---
+    let beaconInputCounter = 0; // 用于生成唯一ID
+
+    function addBeaconInput() {
+        const container = document.getElementById('beaconInputsContainer');
+        const inputRow = document.createElement('div');
+        inputRow.className = 'beacon-input-row';
+
+        const inputId = `beaconInput_${beaconInputCounter++}`;
+        inputRow.innerHTML = `
+            <input type="text" class="form-control form-control-sm" id="${inputId}" placeholder="例如：84C2E4000033">
+            <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeBeaconInput(this)">-</button>
+        `;
+        container.appendChild(inputRow);
+    }
+
+    function removeBeaconInput(button) {
+        const row = button.closest('.beacon-input-row');
+        row.remove();
+    }
+
+    function getBeaconInputs() {
+        const inputs = document.querySelectorAll('#beaconInputsContainer input');
+        const values = [];
+        inputs.forEach(input => {
+            if (input.value.trim() !== '') {
+                values.push(input.value.trim());
+            }
+        });
+        return values;
+    }
+
+    // --- 通用 MAC 选择器逻辑 ---
+    // 获取当前操作模块的 MAC 选择器容器
+    function getCurrentMacSelector(btnOrElement) {
+        // 向上查找最近的 .card 或 .mac-selector-container
+        const card = btnOrElement.closest('.card, .mac-selector-container');
+        if (card) {
+            return card.querySelector('.mac-selector-container') || card;
+        }
+        return null;
+    }
+    // 为当前选择器加载 MAC 列表
+    async function loadMacListForCurrentSelector(btn) {
+        const selectorContainer = getCurrentMacSelector(btn);
+        if (!selectorContainer) {
+            console.error("未找到 MAC 选择器容器");
+            return;
+        }
+        const tagsContainer = selectorContainer.querySelector('.mac-tags-container');
+        const searchInput = selectorContainer.querySelector('.mac-search-box input');
+        const loadBtn = selectorContainer.querySelector('.mac-selector-actions .btn:first-child'); // 假设第一个是加载按钮
+        // 如果全局缓存为空，则从服务器加载
+        if (globalAllMacs.length === 0) {
+            try {
+                loadBtn.disabled = true;
+                loadBtn.textContent = '加载中...';
+                resultBox.textContent = '正在加载 MAC 列表...';
+                resultBox.className = 'result-box text-primary';
+                const res = await axios.get(`${API_BASE}/mac-list`);
+                if (res.data && Array.isArray(res.data)) {
+                    globalAllMacs = res.data;
+                    resultBox.textContent = `✅ 成功加载 ${globalAllMacs.length} 个 MAC 地址。`;
+                    resultBox.className = 'result-box text-success';
+                } else {
+                    throw new Error('返回数据格式错误');
+                }
+            } catch (err) {
+                console.error('加载 MAC 列表失败:', err);
+                resultBox.textContent = `❌ 加载失败：${err.message}`;
+                resultBox.className = 'result-box text-danger';
+                loadBtn.disabled = false;
+                loadBtn.textContent = '🔄 加载';
+                return;
+            } finally {
+                loadBtn.disabled = false;
+                loadBtn.textContent = '🔄 加载';
+            }
+        }
+        // 渲染标签到当前选择器
+        renderMacTags(tagsContainer, globalAllMacs);
+        searchInput.disabled = false;
+    }
+    // 渲染 MAC 标签
+    function renderMacTags(container, macs) {
+        container.innerHTML = '';
+        macs.forEach(mac => {
+            const tag = document.createElement('span');
+            tag.className = 'mac-tag';
+            tag.dataset.mac = mac;
+            tag.innerHTML = `<span class="tag-text">${mac}</span>`;
+            tag.onclick = function() {
+                // 如果是单选模式 (如查询最新 N 条)，确保只有一个被选中
+                const card = this.closest('.card');
+                if (card.querySelector('#latestNumInput')) { // 简单判断是否为单选模式
+                    const selected = container.querySelectorAll('.mac-tag.selected');
+                    selected.forEach(t => {
+                        if (t !== this) t.classList.remove('selected');
+                    });
+                }
+                this.classList.toggle('selected');
+            };
+            container.appendChild(tag);
+        });
+    }
+    // 搜索过滤标签 (在当前选择器内)
+    function filterTags(inputElement) {
+        const term = inputElement.value.toLowerCase().trim();
+        const selectorContainer = getCurrentMacSelector(inputElement);
+        const tags = selectorContainer.querySelectorAll('.mac-tag');
+        tags.forEach(tag => {
+            const mac = tag.dataset.mac.toLowerCase();
+            if (mac.includes(term)) {
+                tag.style.display = '';
+            } else {
+                tag.style.display = 'none';
+            }
+        });
+    }
+    // 获取当前选择器选中的 MAC
+    function getSelectedMacsFromSelector(selectorContainer) {
+        const selectedTags = selectorContainer.querySelectorAll('.mac-tag.selected');
+        return Array.from(selectedTags).map(tag => tag.dataset.mac);
+    }
+    // 全选/清空当前选择器的标签
+    function toggleSelectAllTags(btn, select) {
+        const selectorContainer = getCurrentMacSelector(btn);
+        const tags = selectorContainer.querySelectorAll('.mac-tag');
+        tags.forEach(tag => {
+            if (select) {
+                tag.classList.add('selected');
+            } else {
+                tag.classList.remove('selected');
+            }
+        });
+    }
+    // --- 导出为 Excel (使用 lastDownloadData) ---
+    function exportToExcel() {
+        if (!lastDownloadData || !Array.isArray(lastDownloadData) || lastDownloadData.length === 0) {
+            alert('没有可导出的数据');
+            return;
+        }
+        const worksheet = XLSX.utils.json_to_sheet(lastDownloadData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "设备数据");
+        XLSX.writeFile(workbook, `设备数据_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+    // --- 清空所有数据 ---
+    async function deleteAll() {
+        if (!confirm('⚠️ 警告！你即将清空数据库中所有记录！此操作不可恢复，确定继续吗？')) {
+            return;
+        }
+        try {
+            resultBox.textContent = '正在清空所有数据...';
+            resultBox.className = 'result-box text-primary';
+            const res = await axios.delete(`${API_BASE}/delete/all`);
+            resultBox.textContent = `✅ ${res.data}`;
+            resultBox.className = 'result-box text-success';
+            downloadArea.style.display = 'none';
+            downloadArea.innerHTML = '';
+            // 清空全局缓存
+            globalAllMacs = [];
+        } catch (err) {
+            resultBox.textContent = `❌ 清空失败：${err.message}`;
+            resultBox.className = 'result-box text-danger';
+        }
+    }
+    // --- 插入数据 ---
+    async function insertData() {
+        const data = {
+            v: parseInt(document.getElementById('insertV').value),
+            mac: document.getElementById('insertMainMac').value.trim(),
+            qccid: document.getElementById('insertQccid').value.trim(),
+            battery: parseInt(document.getElementById('insertBattery').value),
+            lat: parseFloat(document.getElementById('insertLat').value),
+            lon: parseFloat(document.getElementById('insertLon').value),
+            time_b: document.getElementById('insertTimeB').value.trim(),
+            scan_type: parseInt(document.getElementById('insertScanType').value),
+            time: document.getElementById('insertTime').value.trim(),
+            beacon_mac: document.getElementById('insertBeaconMac').value.trim(),
+            rssi: parseInt(document.getElementById('insertRssi').value),
+            adv_data: document.getElementById('insertAdvData').value.trim()
+        };
+        if (!data.mac || !data.qccid || !data.time_b || !data.beacon_mac) {
+            insertResult.className = 'text-danger';
+            insertResult.textContent = '❌ 请填写必要字段';
+            return;
+        }
+        insertResult.className = 'text-primary';
+        insertResult.textContent = '插入中...';
+        try {
+            console.log('准备插入的数据:', data);
+            const res = await axios.post(`${API_BASE}/insert`, data, {
+                headers: { 'Content-Type': 'application/json' }
+            });
+            insertResult.className = 'text-success';
+            insertResult.textContent = '✅ ' + res.data;
+            // 插入成功后，如果全局列表中没有这个 MAC，则添加
+            if (!globalAllMacs.includes(data.mac)) {
+                globalAllMacs.push(data.mac);
+            }
+        } catch (err) {
+            insertResult.className = 'text-danger';
+            let errorMsg = '未知错误';
+            if (err.response && err.response.data) {
+                errorMsg = typeof err.response.data === 'object'
+                    ? JSON.stringify(err.response.data, null, 2)
+                    : err.response.data;
+            } else if (err.message) {
+                errorMsg = err.message;
+            }
+            insertResult.textContent = '❌ ' + errorMsg;
+        }
+    }
+    // --- 查询选中 MAC 所有数据 (用于显示前10条) ---
+    async function querySelectedMacsAll(btn) {
+        const selectorContainer = getCurrentMacSelector(btn);
+        const selected = getSelectedMacsFromSelector(selectorContainer);
+        if (selected.length === 0) {
+            alert('请先加载并勾选至少一个 MAC 地址');
+            return;
+        }
+        // 获取额外参数
+        const beaconMac = document.getElementById('beaconMacFilter').value.trim();
+        const startTime = document.getElementById('startTimeFilter').value ? formatDateTimeForBackend(document.getElementById('startTimeFilter').value) : '';
+        const endTime = document.getElementById('endTimeFilter').value ? formatDateTimeForBackend(document.getElementById('endTimeFilter').value) : '';
+        try {
+            resultBox.textContent = `正在查询选中 MAC 的数据（共 ${selected.length} 个）...`;
+            resultBox.className = 'result-box text-primary';
+            downloadArea.style.display = 'none';
+            downloadArea.innerHTML = '';
+            // 清空之前的图表
+            chartsContainer.innerHTML = '';
+            chartInstances.forEach(chart => chart.destroy());
+            chartInstances = [];
+            let allResults = [];
+            for (const mac of selected) {
+                const params = {};
+                if (beaconMac) params.beacon_mac = beaconMac;
+                if (startTime) params.start_time  = startTime;
+                if (endTime) params.end_time  = endTime;
+                console.log("请求参数 params：", params);
+                const res = await axios.get(`${API_BASE}/by_mainmac/${mac}`, { params });
+                if (res.data && Array.isArray(res.data)) {
+                    // 为每个数据项添加主设备MAC标识
+                    const dataWithMainMac = res.data.map(item => ({
+                        ...item,
+                        main_mac: mac
+                    }));
+                    allResults = allResults.concat(dataWithMainMac);
+                }
+            }
+            if (allResults.length > 0) {
+                // 按时间倒序排列 (使用 timeUTC 字段)
+                allResults.sort((a, b) => {
+                    const timeA = new Date(a.time_utc);
+                    const timeB = new Date(b.time_utc);
+                    return timeB - timeA;
+                });
+                // 保存用于显示的数据 (最多10条)
+                lastQueryData = allResults.slice(0, 5);
+                lastDownloadData = allResults;
+                resultBox.textContent = JSON.stringify(lastQueryData, null, 2);
+                resultBox.className = 'result-box text-success';
+                // 如果数据超过10条，显示提示
+                if (allResults.length > 10) {
+                    const truncatedDiv = document.createElement('div');
+                    truncatedDiv.className = 'data-truncated';
+                    truncatedDiv.textContent = `📢 数据已截断显示，共 ${allResults.length} 条记录。`;
+                    resultBox.appendChild(document.createElement('br'));
+                    resultBox.appendChild(truncatedDiv);
+                }
+                // 移除旧的下载按钮，添加新的
+                const downloadBtn = document.createElement('button');
+                downloadBtn.id = 'downloadExcelBtn';
+                downloadBtn.className = 'btn btn-outline-primary';
+                downloadBtn.innerHTML = '📥 下载为 Excel (使用上次查询结果)';
+                downloadBtn.onclick = exportToExcel;
+                downloadArea.innerHTML = '';
+                downloadArea.appendChild(downloadBtn);
+                downloadArea.style.display = 'block';
+                // 为每个选中的主设备MAC生成图表
+                for (const mac of selected) {
+                    const macData = allResults.filter(item => item.main_mac === mac);
+                    if (macData.length > 0) {
+                        createChartForMac(mac, macData);
+                    }
+                }
+            } else {
+                resultBox.textContent = `✅ 查询成功，但未找到相关记录。`;
+                resultBox.className = 'result-box text-info';
+                chartsContainer.innerHTML = '<div class="alert alert-info">没有数据可用于生成图表</div>';
+            }
+        } catch (err) {
+            resultBox.textContent = `❌ 查询失败：${err.message}`;
+            resultBox.className = 'result-box text-danger';
+            chartsContainer.innerHTML = '<div class="alert alert-danger">图表生成失败</div>';
+        }
+    }
+    // --- 下载选中 MAC 所有数据 (Excel) ---
+    async function downloadSelectedMacsAll(btn) {
+        const selectorContainer = getCurrentMacSelector(btn);
+        const selected = getSelectedMacsFromSelector(selectorContainer);
+        if (selected.length === 0) {
+            alert('请先加载并勾选至少一个 MAC 地址');
+            return;
+        }
+        // 获取额外参数
+        const beaconMac = document.getElementById('beaconMacFilter').value.trim();
+        const startTime = document.getElementById('startTimeFilter').value ? formatDateTimeForBackend(document.getElementById('startTimeFilter').value) : '';
+        const endTime = document.getElementById('endTimeFilter').value ? formatDateTimeForBackend(document.getElementById('endTimeFilter').value) : '';
+        // 显示下载状态
+        downloadStatus.style.display = 'inline-block';
+        downloadStatus.className = 'download-status downloading';
+        downloadStatus.textContent = '📥 正在后台下载数据...';
+        try {
+            let allResults = [];
+            for (const mac of selected) {
+                const params = {};
+                if (beaconMac) params.beacon_mac = beaconMac;
+                if (startTime) params.start_time = startTime;
+                if (endTime) params.end_time = endTime;
+                // 使用 axios 实例进行请求，方便管理
+                const response = await axios.get(`${API_BASE}/by_mainmac/${mac}`, { params });
+                if (response.data && Array.isArray(response.data)) {
+                    // 为每个数据项添加主设备MAC标识
+                    const dataWithMainMac = response.data.map(item => ({
+                        ...item,
+                        main_mac: mac
+                    }));
+                    allResults = allResults.concat(dataWithMainMac);
+                }
+            }
+            if (allResults.length > 0) {
+                // 按时间倒序排列 (使用 timeUTC 字段) - 下载时也排序
+                allResults.sort((a, b) => {
+                    const timeA = new Date(a.time_utc);
+                    const timeB = new Date(b.time_utc);
+                    return timeB - timeA;
+                });
+                // 保存完整数据用于下载
+                lastDownloadData = allResults;
+                downloadStatus.className = 'download-status success';
+                downloadStatus.textContent = `✅ 数据下载完成 (${allResults.length} 条记录)。点击 "下载为 Excel" 按钮保存。`;
+                // 更新或创建下载按钮
+                let downloadBtn = document.getElementById('downloadExcelBtn');
+                if (!downloadBtn) {
+                    downloadBtn = document.createElement('button');
+                    downloadBtn.id = 'downloadExcelBtn';
+                    downloadBtn.className = 'btn btn-outline-primary';
+                    downloadBtn.innerHTML = '📥 下载为 Excel';
+                    downloadBtn.onclick = exportToExcel;
+                    downloadArea.innerHTML = '';
+                    downloadArea.appendChild(downloadBtn);
+                    downloadArea.style.display = 'block';
+                } else {
+                    downloadBtn.innerHTML = '📥 下载为 Excel (使用最新下载结果)';
+                    downloadBtn.onclick = exportToExcel;
+                }
+            } else {
+                 downloadStatus.className = 'download-status success';
+                 downloadStatus.textContent = '✅ 下载完成，但未找到相关记录。';
+            }
+        } catch (err) {
+            console.error('下载失败:', err);
+            downloadStatus.className = 'download-status error';
+            downloadStatus.textContent = `❌ 下载失败：${err.message}`;
+        }
+    }
+    // 为指定主设备MAC创建 RSSI 图表
+    function createChartForMac(mainMac, data) {
+        // ... (保持原有的 RSSI 图表代码不变) ...
+        // 按beacon_mac分组
+        const beaconGroups = {};
+        data.forEach(item => {
+            const beaconMac = item.beacon_mac || '未知Beacon';
+            if (!beaconGroups[beaconMac]) {
+                beaconGroups[beaconMac] = [];
+            }
+            beaconGroups[beaconMac].push(item);
+        });
+        // 创建图表容器
+        const chartDiv = document.createElement('div');
+        chartDiv.className = 'chart-container';
+        const chartTitle = document.createElement('h5');
+        chartTitle.className = 'chart-title';
+        chartTitle.textContent = `主设备 MAC: ${mainMac} - RSSI随时间变化趋势`;
+        chartDiv.appendChild(chartTitle);
+        // 添加图表控制按钮
+        const chartControls = document.createElement('div');
+        chartControls.className = 'chart-controls';
+        const chartId = `rssi-chart-${mainMac.replace(/:/g, '').replace(/\./g, '')}`; // 确保图表ID唯一
+        chartControls.innerHTML = `
+            <button class="btn btn-outline-secondary btn-sm" onclick="resetChartZoom('${chartId}')">🔄 重置缩放</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="zoomInChart('${chartId}')">🔍 放大</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="zoomOutChart('${chartId}')">🔎 缩小</button>
+        `;
+        chartDiv.appendChild(chartControls);
+        const canvasContainer = document.createElement('div');
+        canvasContainer.className = 'chart-canvas-container';
+        const canvas = document.createElement('canvas');
+        canvas.id = chartId;
+        canvasContainer.appendChild(canvas);
+        chartDiv.appendChild(canvasContainer);
+        chartsContainer.appendChild(chartDiv);
+        // 准备图表数据
+        const datasets = [];
+        const colors = [
+            'rgba(255, 99, 132, 1)',
+            'rgba(54, 162, 235, 1)',
+            'rgba(255, 206, 86, 1)',
+            'rgba(75, 192, 192, 1)',
+            'rgba(153, 102, 255, 1)',
+            'rgba(255, 159, 64, 1)',
+            'rgba(199, 199, 199, 1)',
+            'rgba(83, 102, 199, 1)',
+            'rgba(40, 159, 64, 1)',
+            'rgba(199, 59, 199, 1)'
+        ];
+        let colorIndex = 0;
+        // 为每个beacon_mac创建数据集
+        Object.keys(beaconGroups).forEach(beaconMac => {
+            const beaconData = beaconGroups[beaconMac];
+            // 按时间排序 (使用 timeUTC 字段)
+            beaconData.sort((a, b) => {
+                const timeA = new Date(a.time_utc);
+                const timeB = new Date(b.time_utc);
+                return timeA - timeB;
+            });
+            // 修改这里：处理时间戳，移除末尾的 .0
+            const dataPoints = beaconData.map(item => {
+                let timeStr = item.time_utc;
+                if (timeStr.endsWith('.0')) {
+                    timeStr = timeStr.slice(0, -2);
+                }
+                return {
+                    x: new Date(timeStr),
+                    y: item.rssi
+                };
+            });
+            datasets.push({
+                label: `Beacon: ${beaconMac}`,
+                data: dataPoints,
+                borderColor: colors[colorIndex % colors.length],
+                showLine: false,
+                backgroundColor: colors[colorIndex % colors.length].replace('1)', '0.2)'),
+                borderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                fill: false,
+                tension: 0.1
+            });
+            colorIndex++;
+        });
+        // 创建图表
+        const ctx = canvas.getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'minute',
+                            tooltipFormat: 'yyyy-MM-dd HH:mm:ss',
+                            displayFormats: {
+                                minute: 'HH:mm',
+                                hour: 'HH:mm',
+                                day: 'MM-dd HH:mm'
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: '时间'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'RSSI (dBm)'
+                        },
+                        beginAtZero: false
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.dataset.label || '';
+                                const rssi = context.parsed.y;
+                                // 修改这里：在 tooltip 中也移除 .0
+                                let timeStr = context.parsed.x.toISOString().replace('T', ' ');
+                                if (timeStr.endsWith('.000Z')) {
+                                    timeStr = timeStr.slice(0, -5);
+                                }
+                                return `${label}: RSSI=${rssi} dBm (时间: ${timeStr})`;
+                            }
+                        }
+                    },
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            boxWidth: 12,
+                            padding: 15
+                        }
+                    },
+                    zoom: {
+                        zoom: {
+                            wheel: {
+                                enabled: true,
+                            },
+                            pinch: {
+                                enabled: true
+                            },
+                            mode: 'x',
+                        },
+                        pan: {
+                            enabled: true,
+                            mode: 'x',
+                        }
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                }
+            },
+            plugins: [ChartZoom] // 启用缩放插件
+        });
+        // 保存图表实例
+        chartInstances.push(chart);
+    }
+    // 图表控制函数
+    function resetChartZoom(chartId) {
+        const chart = Chart.getChart(chartId);
+        if (chart) {
+            chart.resetZoom();
+        }
+    }
+    function zoomInChart(chartId) {
+        const chart = Chart.getChart(chartId);
+        if (chart) {
+            chart.zoom(1.5);
+        }
+    }
+    function zoomOutChart(chartId) {
+        const chart = Chart.getChart(chartId);
+        if (chart) {
+            chart.zoom(0.75);
+        }
+    }
+    // --- 查询选中 MAC 最新 N 条（仅限单选）---
+    async function querySelectedMacLatest(btn) {
+        const selectorContainer = getCurrentMacSelector(btn);
+        const selected = getSelectedMacsFromSelector(selectorContainer);
+        if (selected.length === 0) {
+            alert('请先加载并勾选一个 MAC 地址');
+            return;
+        }
+        if (selected.length > 1) {
+            alert('⚠️ 查询最新 N 条仅支持单选，请只勾选一个 MAC。');
+            return;
+        }
+        const mac = selected[0];
+        const num = document.getElementById('latestNumInput').value.trim();
+        if (!num || isNaN(num) || num < 1) {
+            alert('请输入有效的条数 N（≥1）');
+            return;
+        }
+        try {
+            resultBox.textContent = `正在查询 MAC ${mac} 最新 ${num} 条数据...`;
+            resultBox.className = 'result-box text-primary';
+            downloadArea.style.display = 'none';
+            downloadArea.innerHTML = '';
+            const res = await axios.get(`${API_BASE}/by_mac/${mac}/${num}`);
+            if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+                // 保存完整数据用于下载
+                lastQueryData = res.data; // 这里复用 lastQueryData，也可以单独定义
+                // 显示截断后的数据（最多10条）
+                const displayData = res.data.slice(0, 10);
+                resultBox.textContent = JSON.stringify(displayData, null, 2);
+                resultBox.className = 'result-box text-success';
+                // 如果数据超过10条，显示提示
+                if (res.data.length > 10) {
+                    const truncatedDiv = document.createElement('div');
+                    truncatedDiv.className = 'data-truncated';
+                    truncatedDiv.textContent = `📢 数据已截断显示，共 ${res.data.length} 条记录。完整数据可通过 Excel 下载。`;
+                    resultBox.appendChild(document.createElement('br'));
+                    resultBox.appendChild(truncatedDiv);
+                }
+                const downloadBtn = document.createElement('button');
+                downloadBtn.id = 'downloadExcelBtn';
+                downloadBtn.className = 'btn btn-outline-primary';
+                downloadBtn.innerHTML = '📥 下载为 Excel';
+                downloadBtn.onclick = exportToExcel;
+                downloadArea.innerHTML = '';
+                downloadArea.appendChild(downloadBtn);
+                downloadArea.style.display = 'block';
+                // 清空图表区域（这个功能不生成图表）
+                chartsContainer.innerHTML = '';
+                chartInstances.forEach(chart => chart.destroy());
+                chartInstances = [];
+            } else {
+                resultBox.textContent = `✅ 查询成功，但未找到 MAC 为 ${mac} 的记录。`;
+                resultBox.className = 'result-box text-info';
+                chartsContainer.innerHTML = '';
+                chartInstances.forEach(chart => chart.destroy());
+                chartInstances = [];
+            }
+        } catch (err) {
+            resultBox.textContent = `❌ 查询失败：${err.message}`;
+            resultBox.className = 'result-box text-danger';
+            chartsContainer.innerHTML = '';
+            chartInstances.forEach(chart => chart.destroy());
+            chartInstances = [];
+        }
+    }
+    // --- 删除选中 MAC 所有数据 ---
+    async function deleteSelectedMacsAll(btn) {
+        const selectorContainer = getCurrentMacSelector(btn);
+        const selected = getSelectedMacsFromSelector(selectorContainer);
+        if (selected.length === 0) {
+            alert('请先加载并勾选至少一个 MAC 地址');
+            return;
+        }
+        if (!confirm(`⚠️ 确定要删除 ${selected.length} 个 MAC 的所有记录吗？
+此操作不可恢复！`)) {
+            return;
+        }
+        try {
+            resultBox.textContent = '正在删除选中 MAC 所有数据...';
+            resultBox.className = 'result-box text-primary';
+            const results = [];
+            for (const mac of selected) {
+                try {
+                    const res = await axios.delete(`${API_BASE}/delete/mac/${mac}`);
+                    results.push(`✅ ${mac}: ${res.data}`);
+                    // 从全局缓存中移除
+                    const index = globalAllMacs.indexOf(mac);
+                    if (index > -1) {
+                        globalAllMacs.splice(index, 1);
+                    }
+                } catch (err) {
+                    results.push(`❌ ${mac}: ${err.message}`);
+                }
+            }
+            resultBox.textContent = results.join('');
+            resultBox.className = 'result-box text-success';
+            downloadArea.style.display = 'none';
+            downloadArea.innerHTML = '';
+            // 清空图表
+            chartsContainer.innerHTML = '';
+            chartInstances.forEach(chart => chart.destroy());
+            chartInstances = [];
+            // 清空当前选择器的选中状态和列表
+            toggleSelectAllTags(selectorContainer.querySelector('.mac-selector-actions .btn:last-child'), false); // 触发清空
+            const tagsContainer = selectorContainer.querySelector('.mac-tags-container');
+            tagsContainer.innerHTML = '<div class="text-muted">请重新加载 MAC 列表</div>';
+            selectorContainer.querySelector('.mac-search-box input').disabled = true;
+            selectorContainer.querySelector('.mac-search-box input').value = '';
+        } catch (err) {
+            resultBox.textContent = `❌ 批量删除失败：${err.message}`;
+            resultBox.className = 'result-box text-danger';
+        }
+    }
+    // --- 新增：一键取消选中图表中所有图例 ---
+    function toggleAllDatasets(chartId, visibility = false) {
+        const chart = Chart.getChart(chartId);
+        if (chart) {
+            let allVisible = true;
+            // 检查是否所有数据集都可见，或者强制设置为 visibility
+            chart.data.datasets.forEach((dataset, index) => {
+                const meta = chart.getDatasetMeta(index);
+                if (meta.hidden !== true) { // 如果有任何一个可见，则 allVisible 为 false
+                     allVisible = false;
+                }
+            });
+            const newState = visibility === true ? false : (allVisible === false); // 如果都是可见的，则隐藏；否则显示（或根据 visibility 参数）
+            chart.data.datasets.forEach((dataset, index) => {
+                const meta = chart.getDatasetMeta(index);
+                meta.hidden = newState; // 设置为 true 隐藏，false 显示
+            });
+            chart.update(); // 更新图表
+        }
+    }
+    // --- 新增：查询连接状态功能实现 ---
+    async function queryConnectionStatus(btn) {
+        const selectorContainer = getCurrentMacSelector(btn);
+        const selected = getSelectedMacsFromSelector(selectorContainer);
+        if (selected.length === 0) {
+            alert('请先加载并勾选至少一个**基站** MAC 地址');
+            return;
+        }
+
+        // 清空结果区
+        resultBox.textContent = `正在查询选中基站的连接状态（共 ${selected.length} 个）...`;
+        resultBox.className = 'result-box text-primary';
+        downloadArea.style.display = 'none';
+        downloadArea.innerHTML = '';
+        chartsContainer.innerHTML = '';
+        chartInstances.forEach(chart => chart.destroy());
+        chartInstances = [];
+        try {
+            let allResults = [];
+            for (const mainMac of selected) {
+                const params = {};
+                const res = await axios.get(`${API_BASE}/getworklog/${mainMac}`, { params });
+                if (res.data && Array.isArray(res.data)) {
+                    const dataWithMainMac = res.data.map(item => ({
+                    ...item,
+                    mainMac: item.mainMac || mainMac || 'unknown', // 优先用返回的，否则用查询的
+                    beacon: item.beaconMac,        // 旧逻辑用 beacon，统一字段
+                    stability: item.curStatus      // 旧逻辑用 stability，统一字段
+                }));
+                    allResults = allResults.concat(dataWithMainMac);
+                }
+            }
+            if (allResults.length > 0) {
+                // 保存用于显示的数据（显示前10条）
+                const filteredData = allResults.map(item => ({
+                    baseStation: item.baseStation,
+                    beaconMac: item.beaconMac,
+                    endTime: item.endTime,
+                    endLat: item.endLat,
+                    endLon: item.endLon,
+                    curStatus: item.curStatus
+                }));
+                lastQueryData = filteredData.slice(0, 5);
+                lastDownloadData = filteredData;
+                resultBox.textContent = JSON.stringify(lastQueryData, null, 2);
+                resultBox.className = 'result-box text-success';
+                if (allResults.length > 10) {
+                    const truncatedDiv = document.createElement('div');
+                    truncatedDiv.className = 'data-truncated';
+                    truncatedDiv.textContent = `📢 数据已截断显示，共 ${allResults.length} 条记录。`;
+                    resultBox.appendChild(document.createElement('br'));
+                    resultBox.appendChild(truncatedDiv);
+                }
+                // 移除旧的下载按钮，添加新的（查询结果也可以下载）
+                const downloadBtn = document.createElement('button');
+                downloadBtn.id = 'downloadExcelBtn';
+                downloadBtn.className = 'btn btn-outline-primary';
+                downloadBtn.innerHTML = '📥 下载为 Excel (状态查询结果)';
+                downloadBtn.onclick = exportToStatusExcel; // 使用新的下载函数
+                downloadArea.innerHTML = '';
+                downloadArea.appendChild(downloadBtn);
+                downloadArea.style.display = 'block';
+                // 为每个选中的基站 MAC 生成图表
+                for (const mainMac of selected) {
+                    const macData = allResults.filter(item => item.mainMac === mainMac);
+                    if (macData.length > 0) {
+                        createStatusChartForMainMac(mainMac, macData);
+                    }
+                }
+            } else {
+                resultBox.textContent = `✅ 查询成功，但未找到相关连接状态记录。`;
+                resultBox.className = 'result-box text-info';
+                chartsContainer.innerHTML = '<div class="alert alert-info">没有数据可用于生成连接状态图表</div>';
+            }
+        } catch (err) {
+            resultBox.textContent = `❌ 查询失败：${err.message}`;
+            resultBox.className = 'result-box text-danger';
+            chartsContainer.innerHTML = '<div class="alert alert-danger">连接状态图表生成失败</div>';
+        }
+    }
+    // --- 修改：查询动力车工作日志时间范围 ---
+    async function queryWorkLogTimeRange(btn) {
+        const selectorContainer = getCurrentMacSelector(btn);
+        const selected = getSelectedMacsFromSelector(selectorContainer);
+        if (selected.length === 0) {
+            alert('请先加载并勾选至少一个**动力车** MAC 地址');
+            return;
+        }
+
+        const beaconMacs = getBeaconInputs(); // 获取所有 Beacon MAC 输入值
+        const startTime = document.getElementById('workLogStartTimeFilter').value ? formatDateTimeForBackend(document.getElementById('workLogStartTimeFilter').value) : '';
+        const endTime = document.getElementById('workLogEndTimeFilter').value ? formatDateTimeForBackend(document.getElementById('workLogEndTimeFilter').value) : '';
+
+        // 清空结果区
+        resultBox.textContent = `正在查询选中动力车的工作日志（共 ${selected.length} 个），Beacon MACs: [${beaconMacs.join(', ')}]...`;
+        resultBox.className = 'result-box text-primary';
+        downloadArea.style.display = 'none';
+        downloadArea.innerHTML = '';
+        chartsContainer.innerHTML = ''; // 此功能不生成图表
+        chartInstances.forEach(chart => chart.destroy());
+        chartInstances = [];
+
+        try {
+            let allResults = [];
+            for (const mainMac of selected) {
+                // 如果没有指定Beacon MAC，则至少用一个空字符串进行一次查询
+                const beaconsToQuery = beaconMacs.length > 0 ? beaconMacs : [''];
+                for (const beaconMac of beaconsToQuery) {
+                    const params = {};
+                    if (beaconMac) params.beacon_mac = beaconMac; // 仅在非空时添加
+                    if (startTime) params.start_time = startTime;
+                    if (endTime) params.end_time = endTime;
+
+                    console.log(`请求参数 for ${mainMac} & ${beaconMac || 'N/A'}:`, params);
+
+                    try {
+                        const res = await axios.get(`${API_BASE}/getworklogtimerange/${mainMac}`, { params });
+                        if (res.data && Array.isArray(res.data)) {
+                            const dataWithMainMac = res.data.map(item => ({
+                                ...item,
+                                mainMac: mainMac, // 添加主MAC标识
+                                queriedBeaconMac: beaconMac || 'N/A' // 添加查询时使用的Beacon MAC标识
+                            }));
+                            allResults = allResults.concat(dataWithMainMac);
+                        } else {
+                            console.warn(`API for ${mainMac} & ${beaconMac || 'N/A'} returned non-array data:`, res.data);
+                        }
+                    } catch (err) {
+                        console.error(`查询 ${mainMac} & ${beaconMac || 'N/A'} 时出错:`, err);
+                        // 可以选择在这里收集错误信息，或者跳过
+                        // 例如: alert(`查询 ${mainMac} & ${beaconMac || 'N/A'} 时出错: ${err.message}`);
+                    }
+                }
+            }
+            if (allResults.length > 0) {
+                // 保存用于显示的数据（显示前10条）
+                lastQueryData = allResults.slice(0, 10);
+                lastDownloadData = allResults; // 保存完整数据用于下载
+                resultBox.textContent = JSON.stringify(lastQueryData, null, 2);
+                resultBox.className = 'result-box text-success';
+                if (allResults.length > 10) {
+                    const truncatedDiv = document.createElement('div');
+                    truncatedDiv.className = 'data-truncated';
+                    truncatedDiv.textContent = `📢 数据已截断显示，共 ${allResults.length} 条记录。`;
+                    resultBox.appendChild(document.createElement('br'));
+                    resultBox.appendChild(truncatedDiv);
+                }
+                // 添加下载按钮
+                const downloadBtn = document.createElement('button');
+                downloadBtn.id = 'downloadWorkLogExcelBtn';
+                downloadBtn.className = 'btn btn-outline-primary';
+                downloadBtn.innerHTML = '📥 下载为 Excel (工作日志)';
+                downloadBtn.onclick = exportToWorkLogExcel;
+                downloadArea.innerHTML = '';
+                downloadArea.appendChild(downloadBtn);
+                downloadArea.style.display = 'block';
+            } else {
+                resultBox.textContent = `✅ 查询成功，但未找到相关工作日志记录。`;
+                resultBox.className = 'result-box text-info';
+            }
+        } catch (err) {
+            console.error("查询工作日志时发生未预期的错误:", err);
+            resultBox.textContent = `❌ 查询失败：${err.message}`;
+            resultBox.className = 'result-box text-danger';
+        }
+    }
+    // --- 新增：下载工作日志 Excel ---
+    function exportToWorkLogExcel() {
+        if (!lastDownloadData || !Array.isArray(lastDownloadData) || lastDownloadData.length === 0) {
+            alert('没有可导出的工作日志数据');
+            return;
+        }
+        // 映射数据字段以适应 Excel 输出
+        const mappedData = lastDownloadData.map(item => ({
+            "动力车基站地址": item.mainMac || '',
+            "无动力车信标地址": item.beaconMac || '',
+            "转变时间": item.endTime || '',
+            "绑定状态": item.curStatus || '',
+            // 根据后端 BindingTime 类的实际字段调整
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(mappedData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "工作日志数据");
+        XLSX.writeFile(workbook, `工作日志数据_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+    // 全局颜色管理器
+    const ColorManager = {
+        usedColors: new Map(), // 存储已使用的beaconMac对应的颜色
+        availableColors: [
+            'rgba(40, 167, 69, 0.2)',
+            'rgba(220, 53, 69, 0.2)',
+            'rgba(108, 117, 128, 0.2)',
+            'rgba(255, 193, 7, 0.2)',
+            'rgba(13, 110, 253, 0.2)',
+            'rgba(255, 139, 0, 0.2)',
+            'rgba(154, 205, 50, 0.2)',
+            'rgba(75, 0, 130, 0.2)',
+            'rgba(255, 20, 147, 0.4)',
+            'rgba(30, 144, 255, 0.4)',
+            'rgba(255, 105, 180, 0.4)',
+            'rgba(50, 205, 50, 0.4)',
+            'rgba(255, 69, 0, 0.4)',
+            'rgba(123, 104, 238, 0.4)',
+            'rgba(255, 140, 0, 0.4)',
+            'rgba(0, 255, 127, 0.4)',
+            'rgba(70, 130, 180, 0.4)',
+            'rgba(218, 165, 32, 0.4)',
+            'rgba(139, 0, 139, 0.4)',
+            'rgba(255, 192, 203, 0.4)'
+        ],
+        // 为特定的beaconMac分配颜色
+        getColor: function(beaconMac) {
+            // 如果这个beaconMac已经有颜色了，直接返回
+            if (this.usedColors.has(beaconMac)) {
+                return this.usedColors.get(beaconMac);
+            }
+            // 查找一个未被使用的颜色
+            for (let i = 0; i < this.availableColors.length; i++) {
+                const color = this.availableColors[i];
+                // 检查这个颜色是否已被其他beaconMac使用
+                const isColorUsed = Array.from(this.usedColors.values()).includes(color);
+                if (!isColorUsed) {
+                    this.usedColors.set(beaconMac, color);
+                    return color;
+                }
+            }
+            // 如果所有预定义颜色都用完了，生成一个随机颜色
+            return this.generateRandomColor(beaconMac);
+        },
+        // 生成基于beaconMac的确定性随机颜色
+        generateRandomColor: function(beaconMac) {
+            // 基于beaconMac的哈希值生成确定性的颜色
+            let hash = 0;
+            for (let i = 0; i < beaconMac.length; i++) {
+                hash = beaconMac.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const hue = Math.abs(hash) % 360;
+            const saturation = 70 + (Math.abs(hash * 3) % 30); // 70-100%
+            const lightness = 40 + (Math.abs(hash * 7) % 30);  // 40-70%
+            return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.4)`;
+        },
+        // 重置颜色管理器（可选）
+        reset: function() {
+            this.usedColors.clear();
+        }
+    };
+
+    // --- 查询收费 ---
+    async function queryMoney(btn) {
+        const selectorContainer = getCurrentMacSelector(btn);
+        const selected = getSelectedMacsFromSelector(selectorContainer);
+        if (selected.length === 0) {
+            alert('请先加载并勾选至少一个主设备 MAC');
+            return;
+        }
+
+        const beaconMac = document.getElementById('moneyBeaconMac').value.trim();
+        const startTime = document.getElementById('moneyStartTime').value ? formatDateTimeForBackend(document.getElementById('moneyStartTime').value) : '';
+        const endTime = document.getElementById('moneyEndTime').value ? formatDateTimeForBackend(document.getElementById('moneyEndTime').value) : '';
+
+        resultBox.textContent = `正在查询 ${selected.length} 个设备的收费数据...`;
+        resultBox.className = 'result-box text-primary';
+        downloadArea.style.display = 'none';
+        downloadArea.innerHTML = '';
+        chartsContainer.innerHTML = ''; // 不生成图表
+        chartInstances.forEach(chart => chart.destroy());
+        chartInstances = [];
+
+        try {
+            let allResults = [];
+            for (const mainMac of selected) {
+                const params = {};
+                if (beaconMac) params.beacon_mac = beaconMac;
+                if (startTime) params.start_time = startTime;
+                if (endTime) params.end_time = endTime;
+
+                const res = await axios.get(`${API_BASE}/getmoney`, {
+                    params: { ...params, mainMac: mainMac }
+                });
+
+                if (res.data && Array.isArray(res.data)) {
+                    // 为每条记录添加 mainMac 字段便于识别
+                    const dataWithMainMac = res.data.map(item => ({
+                        ...item,
+                        mainMac: mainMac
+                    }));
+                    allResults = allResults.concat(dataWithMainMac);
+                }
+            }
+
+            if (allResults.length > 0) {
+                lastQueryData = allResults.slice(0, 20); // 显示前20条
+                lastDownloadData = allResults;
+
+                // 创建表格显示数据
+                const table = createMoneyTable(allResults);
+                resultBox.innerHTML = '';
+                resultBox.appendChild(table);
+                resultBox.className = 'result-box text-success';
+
+                if (allResults.length > 20) {
+                    const truncatedDiv = document.createElement('div');
+                    truncatedDiv.className = 'data-truncated';
+                    truncatedDiv.textContent = `📢 数据已截断显示，共 ${allResults.length} 条记录。`;
+                    resultBox.appendChild(truncatedDiv);
+                }
+
+                // 添加下载按钮
+                const downloadBtn = document.createElement('button');
+                downloadBtn.id = 'downloadMoneyExcelBtn';
+                downloadBtn.className = 'btn btn-outline-primary';
+                downloadBtn.innerHTML = '📥 下载收费明细为 Excel';
+                downloadBtn.onclick = exportToMoneyExcel;
+                downloadArea.innerHTML = '';
+                downloadArea.appendChild(downloadBtn);
+                downloadArea.style.display = 'block';
+            } else {
+                resultBox.textContent = '✅ 查询成功，但未找到收费记录。';
+                resultBox.className = 'result-box text-info';
+            }
+        } catch (err) {
+            console.error('查询收费失败:', err);
+            resultBox.textContent = `❌ 查询失败：${err.message}`;
+            resultBox.className = 'result-box text-danger';
+        }
+    }
+
+    // 创建收费数据表格
+    function createMoneyTable(data) {
+        const table = document.createElement('table');
+        table.className = 'money-table';
+        table.style.cssText = `
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-family: Arial, sans-serif;
+        `;
+
+        // 创建表头
+        const thead = document.createElement('thead');
+        thead.style.backgroundColor = '#f8f9fa';
+        thead.style.borderBottom = '2px solid #dee2e6';
+
+        const headerRow = document.createElement('tr');
+        const headers = ['牵引动力车', '无动力车', '费用(元)'];
+
+        headers.forEach(headerText => {
+            const th = document.createElement('th');
+            th.textContent = headerText;
+            th.style.cssText = `
+                padding: 12px 8px;
+                text-align: left;
+                font-weight: bold;
+                border-bottom: 2px solid #dee2e6;
+            `;
+            headerRow.appendChild(th);
+        });
+
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // 创建表体
+        const tbody = document.createElement('tbody');
+
+        data.forEach((item, index) => {
+            const row = document.createElement('tr');
+            row.style.borderBottom = '1px solid #dee2e6';
+
+            if (index % 2 === 0) {
+                row.style.backgroundColor = '#ffffff';
+            } else {
+                row.style.backgroundColor = '#f8f9fa';
+            }
+
+
+            // 主设备 MAC
+            const mainMacCell = document.createElement('td');
+            mainMacCell.textContent = item.mainMac || '';
+            mainMacCell.style.padding = '8px';
+
+            // Beacon MAC
+            const beaconMacCell = document.createElement('td');
+            beaconMacCell.textContent = item.beaconMac || '';
+            beaconMacCell.style.padding = '8px';
+
+            // 费用
+            const moneyCell = document.createElement('td');
+            moneyCell.textContent = item.money || '0';
+            moneyCell.style.padding = '8px';
+
+            row.appendChild(mainMacCell);
+            row.appendChild(beaconMacCell);
+            row.appendChild(moneyCell);
+
+            tbody.appendChild(row);
+        });
+
+        table.appendChild(tbody);
+
+        return table;
+    }
+
+    // --- 导出收费数据为 Excel ---
+    function exportToMoneyExcel() {
+        if (!lastDownloadData || !Array.isArray(lastDownloadData) || lastDownloadData.length === 0) {
+            alert('没有可导出的收费数据');
+            return;
+        }
+
+        const mappedData = lastDownloadData.map(item => ({
+            "牵引车": item.mainMac || '',
+            "无动力车": item.beaconMac || '',
+            "费用(元)": item.money || 0
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(mappedData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "收费明细");
+        XLSX.writeFile(workbook, `收费明细_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+    /**
+     * 为单个主MAC地址创建一个连接状态随时间变化的图表。
+     * @param {string} mainMac - 主MAC地址.
+     * @param {Array<Object>} data - 包含状态信息的数组.
+     */
+    function createStatusChartForMainMac(mainMac, data) {
+        // --- 1. 数据预处理 ---
+        // 按 beacon_mac 分组
+        const beaconGroups = {};
+        data.forEach(item => {
+            const beaconMac = item.beacon || item.beaconMac || '未知Beacon';
+            if (!beaconGroups[beaconMac]) {
+                beaconGroups[beaconMac] = [];
+            }
+            beaconGroups[beaconMac].push(item);
+        });
+        // --- 2. 创建图表容器 ---
+        const chartDiv = document.createElement('div');
+        chartDiv.className = 'chart-container';
+        const chartTitle = document.createElement('h5');
+        chartTitle.className = 'chart-title';
+        chartTitle.textContent = `基站 MAC: ${mainMac} - 连接状态随时间变化趋势`;
+        chartDiv.appendChild(chartTitle);
+        // 添加图表控制按钮
+        const chartControls = document.createElement('div');
+        chartControls.className = 'chart-controls';
+        const chartId = `status-chart-${mainMac.replace(/:/g, '').replace(/\./g, '')}`;
+        chartControls.innerHTML = `
+            <button class="btn btn-outline-secondary btn-sm" onclick="resetChartZoom('${chartId}')">🔄 重置缩放</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="zoomInChart('${chartId}')">🔍 放大</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="zoomOutChart('${chartId}')">🔎 缩小</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="toggleAllDatasets('${chartId}', true)">👁️ 显示全部</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="toggleAllDatasets('${chartId}', false)">👁️ 隐藏全部</button>
+        `;
+        chartDiv.appendChild(chartControls);
+        const canvasContainer = document.createElement('div');
+        canvasContainer.className = 'chart-canvas-container';
+        const canvas = document.createElement('canvas');
+        canvas.id = chartId;
+        canvasContainer.appendChild(canvas);
+        chartDiv.appendChild(canvasContainer);
+        // 假设 chartsContainer 已经在外部定义
+        if (typeof chartsContainer !== 'undefined') {
+            chartsContainer.appendChild(chartDiv);
+        } else {
+            console.error("chartsContainer is not defined.");
+            document.body.appendChild(chartDiv);
+        }
+        // --- 3. 准备图表数据 ---
+        const datasets = [];
+        const statusValueMap = {
+            'Bound': 3,
+            'Unbound': 1,
+            'In Transition': 2
+        };
+        // 为每个 beacon_mac 创建数据集
+        Object.keys(beaconGroups).forEach((beaconMac) => {
+            const beaconData = beaconGroups[beaconMac];
+            // 按时间排序 (使用 endTime 字段)
+            beaconData.sort((a, b) => {
+                const timeA = new Date(a.endTime);
+                const timeB = new Date(b.endTime);
+                return timeA - timeB;
+            });
+            // 处理时间戳，确保时间对象有效
+            const dataPoints = beaconData.map(item => {
+                // 使用 endTime 字段作为时间
+                const timeValue = new Date(item.endTime);
+                // 检查时间是否有效
+                if (isNaN(timeValue.getTime())) {
+                    console.warn(`无效的时间戳: ${item.endTime}`, item);
+                    return null; // 跳过无效数据点
+                }
+                // 将状态字符串映射为数值
+                const statusValue = statusValueMap[item.stability || item.curStatus] || 0; // 默认值0表示未知状态
+                // 跳过状态值为0的数据点
+                if (statusValue === 0) {
+                    return null;
+                }
+                return {
+                    x: timeValue,
+                    y: statusValue // 使用数值而非字符串
+                };
+            }).filter(point => point !== null); // 过滤掉无效数据点和状态为0的数据点
+            // 使用颜色管理器获取颜色
+            const color = ColorManager.getColor(beaconMac);
+            datasets.push({
+                label: `Beacon: ${beaconMac}`,
+                data: dataPoints,
+                borderColor: color,
+                showLine: false,
+                backgroundColor: color,
+                borderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 4,
+                fill: false,
+                tension: 0.1,
+                yAxisID: 'y'
+            });
+        });
+        // --- 4. 创建图表 ---
+        const ctx = canvas.getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'minute',
+                            tooltipFormat: 'yyyy-MM-dd HH:mm:ss',
+                            displayFormats: {
+                                minute: 'HH:mm',
+                                hour: 'HH:mm',
+                                day: 'MM-dd HH:mm'
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: '时间'
+                        }
+                    },
+                    y: {
+                        id: 'y',
+                        type: 'linear',
+                        title: {
+                            display: true,
+                            text: '连接状态'
+                        },
+                        afterBuildTicks: function(scale) {
+                            scale.ticks = [
+                                { value: 1, label: '未绑定 (Unbound)' },
+                                { value: 2, label: '转换中 (In Transition)' },
+                                { value: 3, label: '已绑定 (Bound)' }
+                            ];
+                        },
+                        min: 0.8,
+                        max: 3.2,
+                        ticks: {
+                            callback: function(value) {
+                                if (value === 1) return '未绑定 (Unbound)';
+                                if (value === 2) return '转换中 (In Transition)';
+                                if (value === 3) return '已绑定 (Bound)';
+                                return '';
+                            }
+                        },
+                        grid: {
+                            drawOnChartArea: true,
+                            color: function(context) {
+                                if (context.tick && [1, 2, 3].includes(context.tick.value)) {
+                                    return 'rgba(0, 0, 0, 0.15)';
+                                }
+                                return 'rgba(0, 0, 0, 0)';
+                            },
+                            lineWidth: 1,
+                            borderDash: [5, 5],
+                        },
+                        position: 'left',
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.dataset.label || '';
+                                const statusValue = context.parsed.y;
+                                // 获取状态名称
+                                let statusName = '';
+                                if (statusValue === 1) statusName = '未绑定 (Unbound)';
+                                else if (statusValue === 2) statusName = '转换中 (In Transition)';
+                                else if (statusValue === 3) statusName = '已绑定 (Bound)';
+                                else statusName = '未知';
+                                // 格式化时间
+                                let timeStr = new Date(context.parsed.x).toLocaleString();
+                                return `${label}: 状态=${statusName} (时间: ${timeStr})`;
+                            }
+                        }
+                    },
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            boxWidth: 12,
+                            padding: 15,
+                            // 自定义图例颜色
+                            generateLabels: function(chart) {
+                                const original = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+                                return original.map((label, index) => {
+                                    const dataset = chart.data.datasets[index];
+                                    const beaconMac = dataset.label.replace('Beacon: ', '');
+                                    label.fillStyle = ColorManager.getColor(beaconMac);
+                                    label.strokeStyle = ColorManager.getColor(beaconMac);
+                                    return label;
+                                });
+                            }
+                        }
+                    },
+                    zoom: {
+                        zoom: {
+                            wheel: {
+                                enabled: true,
+                            },
+                            pinch: {
+                                enabled: true
+                            },
+                            mode: 'x',
+                        },
+                        pan: {
+                            enabled: true,
+                            mode: 'x',
+                        }
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+            }
+        });
+        // --- 5. 保存图表实例 ---
+        if (typeof chartInstances !== 'undefined') {
+            chartInstances.push(chart);
+        } else {
+            console.error("chartInstances array is not defined.");
+        }
+        return chart;
+    }
+    // --- 新增：下载状态查询结果 Excel ---
+    function exportToStatusExcel() {
+        if (!lastQueryData || !Array.isArray(lastQueryData) || lastQueryData.length === 0) {
+            alert('没有可导出的数据');
+            return;
+        }
+        const mappedData = lastDownloadData.map(item => ({
+            "基站 MAC": item.baseStation || '',
+            "Beacon MAC": item.beaconMac || '',
+            "结束时间": item.endTime || '',
+            "连接状态": item.curStatus || '',
+            "终点纬度": item.endLat || 0,
+            "终点经度": item.endLon || 0
+            // 可根据需要添加 startTime/startLat/startLon（如果后端返回）
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(mappedData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "连接状态数据");
+        XLSX.writeFile(workbook, `连接状态数据_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+</script>
+</body>
+</html>
